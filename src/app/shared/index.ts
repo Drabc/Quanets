@@ -1,1 +1,1 @@
-export * from './test-scene'
+export * from './phaser-game.service'
