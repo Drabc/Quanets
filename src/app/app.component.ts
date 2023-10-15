@@ -1,4 +1,4 @@
-import { Component } from '@angular/core'
+import { Component, OnInit } from '@angular/core'
 import { PhaserGameService } from './shared/phaser-game.service'
 
 @Component({
@@ -6,7 +6,11 @@ import { PhaserGameService } from './shared/phaser-game.service'
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
 
-  public constructor(private _phaserGame: PhaserGameService) {}
+  public constructor(private readonly _phaserGame: PhaserGameService) {}
+
+  public ngOnInit(): void {
+    this._phaserGame.renderGame()
+  }
 }

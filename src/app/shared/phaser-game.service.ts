@@ -1,5 +1,5 @@
 import { Injectable, NgZone } from '@angular/core'
-import { TestScene } from '../game'
+import { GameSetupScene } from '../game'
 import * as Phaser from 'phaser'
 
 @Injectable({
@@ -10,15 +10,12 @@ export class PhaserGameService {
   config: Phaser.Types.Core.GameConfig
 
   constructor(
-    _ngZone: NgZone
+    private readonly _ngZone: NgZone
   ) {
     this.config = {
       type: Phaser.AUTO,
-      height: 600,
-      width: 800,
-      backgroundColor: "#e1e3e6",
-      scene: [ TestScene ],
-      parent: 'gameContainer',
+      scene: [ GameSetupScene ],
+      parent: 'game-container',
       physics: {
         default: 'arcade',
         arcade: {
@@ -26,7 +23,10 @@ export class PhaserGameService {
         }
       }
     }
-    _ngZone.runOutsideAngular(() => {
+  }
+
+  public renderGame(): void {
+    this._ngZone.runOutsideAngular(() => {
       this.phaserGame = new Phaser.Game(this.config)
     })
   }

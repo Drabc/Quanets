@@ -1,6 +1,11 @@
 import * as Phaser from 'phaser'
 import { ConnectorArrow } from '.'
 
+interface DirectionData {
+  MULTIPLIER: number,
+  VALUE: number
+}
+
 const CONNECTOR_ARROW_SPACE = 15
 const DIRECTIONS  = {
   UP: {
@@ -22,14 +27,9 @@ const DIRECTIONS  = {
 }
 
 export class Connector extends Phaser.Physics.Arcade.Image {
-
-  public upArrow: ConnectorArrow
-  public downArrow: ConnectorArrow
-  public rightArrow: ConnectorArrow
-  public leftArrow: ConnectorArrow
-
   private _toggler: boolean = false
   private _edges: Record<number, Connector | undefined> = {}
+  private readonly _arrows: Record<number, ConnectorArrow> = {}
 
   public get xIndex(): number {
     return this._xIndex
@@ -40,12 +40,14 @@ export class Connector extends Phaser.Physics.Arcade.Image {
   }
 
   public constructor (
-    scene: Phaser. Scene, 
-    x: number, 
-    y: number, 
-    texture: string, 
-    private readonly _xIndex: number, 
-    private readonly _yIndex: number
+    scene: Phaser. Scene,
+    x: number,
+    y: number,
+    texture: string,
+    private readonly _xIndex: number,
+    private readonly _yIndex: number,
+    private readonly _xMax: number,
+    private readonly _yMax: number
   ) {
     super(scene, x, y, texture)
     scene.add.existing(this)
@@ -55,54 +57,50 @@ export class Connector extends Phaser.Physics.Arcade.Image {
     this._edges[DIRECTIONS.RIGHT.VALUE] = undefined
     this._edges[DIRECTIONS.LEFT.VALUE] = undefined
 
-    this.upArrow = new ConnectorArrow(scene, x, y)
-    this.upArrow.angle = -90
-    this.upArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex, this._yIndex-1, DIRECTIONS.UP.VALUE) })
-    this._alignVerticalArrow(this.upArrow, DIRECTIONS.UP.MULTIPLIER)
-
-    this.downArrow = new ConnectorArrow(scene, x, y)
-    this.downArrow.angle = 90
-    this._alignVerticalArrow(this.downArrow, DIRECTIONS.DOWN.MULTIPLIER)
-    this.downArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex, this._yIndex+1, DIRECTIONS.DOWN.VALUE) })
-
-    this.rightArrow = new ConnectorArrow(scene, x, y)
-    this._alignHorizontalArrow(this.rightArrow, DIRECTIONS.RIGHT.MULTIPLIER)
-    this.rightArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex+1, this._yIndex, DIRECTIONS.RIGHT.VALUE) })
-
-    this.leftArrow = new ConnectorArrow(scene, x, y)
-    this.leftArrow.angle = 180
-    this._alignHorizontalArrow(this.leftArrow, DIRECTIONS.LEFT.MULTIPLIER)
-    this.leftArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex-1, this._yIndex, DIRECTIONS.LEFT.VALUE) })
+    this._createArrow(this._xIndex, this._yIndex-1, -90, DIRECTIONS.UP, scene)
+    this._createArrow(this._xIndex, this._yIndex+1, 90, DIRECTIONS.DOWN, scene)
+    this._createArrow(this._xIndex+1, this._yIndex, 0, DIRECTIONS.RIGHT, scene)
+    this._createArrow(this._xIndex-1, this._yIndex, 180, DIRECTIONS.LEFT, scene)
 
     this.setInteractive()
-    this.on('pointerdown', this._toggleArrows)
   }
 
-  public setEdge(direction: number, connector: Connector): void { 
+  public setEdge(direction: number, connector: Connector): void {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete this._arrows[direction]
     this._edges[direction] = connector
   }
 
   public getConnectorAtEdge(direction: number): Connector | undefined {
     return this._edges[direction]
   }
-  
-  private _toggleArrows(): void {
-    this._toggler = !this._toggler
+
+  public isFull(): boolean {
+    return !Object.keys(this._arrows).some((edgeIndex: string) => this._edges[parseInt(edgeIndex)] === undefined)
+  }
+
+  public toggleArrows(force?: boolean): void {
+    this._toggler = force ?? !this._toggler
     this._toggler ? this._showArrows() : this._hideArrows()
   }
 
+  private _createArrow(xIndex: number, yIndex: number, angle: number, directionData: DirectionData, scene: Phaser. Scene): void {
+    if (xIndex >= 0 && xIndex <= this._xMax && yIndex >= 0 && yIndex <= this._yMax) {
+      const arrow = new ConnectorArrow(scene, this.x, this.y)
+      const alignmentStrategy = directionData.VALUE%2 === 0 ? this._alignVerticalArrow : this._alignHorizontalArrow
+      arrow.angle = angle
+      arrow.on('pointerdown', () => { this._handleConnectionRequest(xIndex, yIndex, directionData.VALUE) })
+      alignmentStrategy.call(this, arrow, directionData.MULTIPLIER)
+      this._arrows[directionData.VALUE] = arrow
+    }
+  }
+
   private _showArrows(): void {
-    this.upArrow.setVisible(true)
-    this.downArrow.setVisible(true)
-    this.rightArrow.setVisible(true)
-    this.leftArrow.setVisible(true)
+    Object.values(this._arrows).forEach((arrow) => arrow.setVisible(true))
   }
 
   private _hideArrows(): void {
-    this.upArrow.setVisible(false)
-    this.downArrow.setVisible(false)
-    this.rightArrow.setVisible(false)
-    this.leftArrow.setVisible(false)
+    Object.values(this._arrows).forEach((arrow) => arrow.setVisible(false))
   }
 
   private _alignVerticalArrow(arrow: Phaser.Physics.Arcade.Image, direction: number): void {
@@ -130,7 +128,7 @@ export class Connector extends Phaser.Physics.Arcade.Image {
   private _handleConnectionRequest(x: number, y: number, direction: number): void {
     x = Math.max(0, x)
     y = Math.max(0, y)
-    this._toggleArrows()
+    this.toggleArrows()
     this.emit('connectionRequest', {x, y, direction })
   }
 
