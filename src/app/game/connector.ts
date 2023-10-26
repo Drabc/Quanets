@@ -1,53 +1,80 @@
 import * as Phaser from 'phaser'
 import { ConnectorArrow } from '.'
+import { GridCell } from './shared'
 
-const CONNECTOR_ARROW_SPACE = 15
-const DIRECTIONS  = {
+interface DirectionData {
+  MULTIPLIER: number
+  VALUE: number
+  X_SCALE: number
+  Y_SCALE: number
+}
+
+interface Directions {
+  UP: DirectionData
+  RIGHT: DirectionData
+  DOWN: DirectionData
+  LEFT: DirectionData
+}
+
+interface EdgeInfo {
+  lineScales: number[]
+  index: number
+}
+
+const DIRECTIONS: Directions = {
   UP: {
     MULTIPLIER: 1,
-    VALUE: 0
+    VALUE: 0,
+    Y_SCALE: 0,
+    X_SCALE: 0.5
   },
   DOWN: {
     MULTIPLIER: -1,
-    VALUE: 2
+    VALUE: 2,
+    Y_SCALE: 1,
+    X_SCALE: .5
   },
   RIGHT: {
     MULTIPLIER: -1,
-    VALUE: 1
+    VALUE: 1,
+    Y_SCALE: .5,
+    X_SCALE: 1
   },
   LEFT: {
     MULTIPLIER: 1,
-    VALUE: 3
+    VALUE: 3,
+    Y_SCALE: .5,
+    X_SCALE: 0
   }
 }
 
-export class Connector extends Phaser.Physics.Arcade.Image {
-
-  public upArrow: ConnectorArrow
-  public downArrow: ConnectorArrow
-  public rightArrow: ConnectorArrow
-  public leftArrow: ConnectorArrow
-
+export class Connector extends Phaser.GameObjects.Image {
   private _toggler: boolean = false
   private _edges: Record<number, Connector | undefined> = {}
+  private readonly _arrows: Record<number, ConnectorArrow> = {}
+  private readonly _linesGraphic: Phaser.GameObjects.Graphics
+  private readonly _edgesInfo: Record<number, EdgeInfo> = {}
 
-  public get xIndex(): number {
-    return this._xIndex
+  public get index(): number {
+    return this._index
   }
 
-  public get yIndex(): number {
-    return this._yIndex
+  public get gridCell(): GridCell {
+    return this._gridCell
   }
 
   public constructor (
-    scene: Phaser. Scene, 
-    x: number, 
-    y: number, 
-    texture: string, 
-    private readonly _xIndex: number, 
-    private readonly _yIndex: number
+    scene: Phaser. Scene,
+    private readonly _gridCell: GridCell,
+    x: number,
+    y: number,
+    texture: string,
+    private readonly _index: number,
+    private readonly _columns: number,
+    private readonly _rows: number
   ) {
     super(scene, x, y, texture)
+    this.setScale(.6).setInteractive()
     scene.add.existing(this)
 
     this._edges[DIRECTIONS.UP.VALUE] = undefined
@@ -55,83 +82,103 @@ export class Connector extends Phaser.Physics.Arcade.Image {
     this._edges[DIRECTIONS.RIGHT.VALUE] = undefined
     this._edges[DIRECTIONS.LEFT.VALUE] = undefined
 
-    this.upArrow = new ConnectorArrow(scene, x, y)
-    this.upArrow.angle = -90
-    this.upArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex, this._yIndex-1, DIRECTIONS.UP.VALUE) })
-    this._alignVerticalArrow(this.upArrow, DIRECTIONS.UP.MULTIPLIER)
+    this._setupEdgesInfo()
 
-    this.downArrow = new ConnectorArrow(scene, x, y)
-    this.downArrow.angle = 90
-    this._alignVerticalArrow(this.downArrow, DIRECTIONS.DOWN.MULTIPLIER)
-    this.downArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex, this._yIndex+1, DIRECTIONS.DOWN.VALUE) })
-
-    this.rightArrow = new ConnectorArrow(scene, x, y)
-    this._alignHorizontalArrow(this.rightArrow, DIRECTIONS.RIGHT.MULTIPLIER)
-    this.rightArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex+1, this._yIndex, DIRECTIONS.RIGHT.VALUE) })
-
-    this.leftArrow = new ConnectorArrow(scene, x, y)
-    this.leftArrow.angle = 180
-    this._alignHorizontalArrow(this.leftArrow, DIRECTIONS.LEFT.MULTIPLIER)
-    this.leftArrow.on('pointerdown', () => { this._handleConnectionRequest(this._xIndex-1, this._yIndex, DIRECTIONS.LEFT.VALUE) })
-
-    this.setInteractive()
-    this.on('pointerdown', this._toggleArrows)
+    this._createArrow(this._edgesInfo[DIRECTIONS.UP.VALUE].index, -90, DIRECTIONS.UP, scene)
+    this._createArrow(this._edgesInfo[DIRECTIONS.RIGHT.VALUE].index % this._columns - 1, 0, DIRECTIONS.RIGHT, scene)
+    this._createArrow(this._edgesInfo[DIRECTIONS.DOWN.VALUE].index, 90, DIRECTIONS.DOWN, scene)
+    this._createArrow((this._index%this._columns) - 1, 180, DIRECTIONS.LEFT, scene)
+    this._linesGraphic = scene.add.graphics()
+    this._gridCell.addObject(this._linesGraphic, .5)
   }
 
-  public setEdge(direction: number, connector: Connector): void { 
+  public setEdge(direction: number, connector: Connector): void {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete this._arrows[direction]
     this._edges[direction] = connector
   }
 
   public getConnectorAtEdge(direction: number): Connector | undefined {
     return this._edges[direction]
   }
-  
-  private _toggleArrows(): void {
-    this._toggler = !this._toggler
+
+  public isFull(): boolean {
+    return !Object.keys(this._arrows).some((edgeIndex: string) => this._edges[parseInt(edgeIndex)] === undefined)
+  }
+
+  public toggleArrows(force?: boolean): void {
+    this._toggler = force ?? !this._toggler
     this._toggler ? this._showArrows() : this._hideArrows()
   }
 
+  private _createArrow(index: number, angle: number, directionData: DirectionData, scene: Phaser. Scene): void {
+    if (index >= 0 && index < (this._columns*this._rows)) {
+      const arrow = new ConnectorArrow(scene, 0, 0)
+      const edgeInfo = this._edgesInfo[directionData.VALUE]
+      arrow.angle = angle
+      this._gridCell.addObject(arrow, directionData.X_SCALE, directionData.Y_SCALE)
+      arrow.on('pointerdown', () => { this._handleConnectionRequest(edgeInfo.index, directionData) })
+      this._arrows[directionData.VALUE] = arrow
+    }
+  }
+
   private _showArrows(): void {
-    this.upArrow.setVisible(true)
-    this.downArrow.setVisible(true)
-    this.rightArrow.setVisible(true)
-    this.leftArrow.setVisible(true)
+    Object.values(this._arrows).forEach((arrow) => arrow.setVisible(true))
   }
 
   private _hideArrows(): void {
-    this.upArrow.setVisible(false)
-    this.downArrow.setVisible(false)
-    this.rightArrow.setVisible(false)
-    this.leftArrow.setVisible(false)
+    Object.values(this._arrows).forEach((arrow) => arrow.setVisible(false))
   }
 
-  private _alignVerticalArrow(arrow: Phaser.Physics.Arcade.Image, direction: number): void {
-    const midX1 = this.x + this.displayWidth / 2
-    const midX2 = arrow.x + arrow.displayWidth / 2
-
-    // Calculate the difference in midpoints
-    const diffX = midX1 - midX2
-
-    arrow.x += diffX * direction
-    arrow.y -= CONNECTOR_ARROW_SPACE * direction
+  private _handleConnectionRequest(index: number, direction: DirectionData): void {
+    this.toggleArrows()
+    this._displayConnection(direction)
+    this.emit('connectionRequest', { index, direction: direction.VALUE })
   }
 
-  private _alignHorizontalArrow(arrow: Phaser.Physics.Arcade.Image, direction: number): void {
-    const midY1 = this.y + this.displayWidth / 2
-    const midY2 = arrow.y + arrow.displayWidth / 2
-
-    // Calculate the difference in midpoints
-    const diffY = midY1 - midY2
-
-    arrow.y += diffY * direction
-    arrow.x -= CONNECTOR_ARROW_SPACE * direction
+  private _displayConnection(direction: DirectionData): void {
+    const scales = this._edgesInfo[direction.VALUE]
+    this._drawConnection(scales.lineScales[0], scales.lineScales[1])
   }
 
-  private _handleConnectionRequest(x: number, y: number, direction: number): void {
-    x = Math.max(0, x)
-    y = Math.max(0, y)
-    this._toggleArrows()
-    this.emit('connectionRequest', {x, y, direction })
+  private _drawConnection(x2: number, y2: number): void {
+    this._linesGraphic.lineStyle(2, 9608341) // Line width and color
+    this._linesGraphic.beginPath()
+    this._linesGraphic.moveTo(0, 0)
+    this._linesGraphic.lineTo(x2, y2)
+    this._linesGraphic.closePath()
+    this._linesGraphic.strokePath()
+
+    this._gridCell.addObject(this._linesGraphic, .5)
   }
 
+  private _setupEdgesInfo(): void {
+    const downY = this._gridCell.height - this.displayHeight/2
+    const upY: number = -downY
+    const rightX: number = this._gridCell.width - this.displayWidth/2
+    const leftX: number = -rightX
+
+    this._edgesInfo[DIRECTIONS.DOWN.VALUE] ||= this._nullEdgeInfo()
+    this._edgesInfo[DIRECTIONS.DOWN.VALUE].lineScales = [0, downY]
+    this._edgesInfo[DIRECTIONS.DOWN.VALUE].index = this._index + this._columns
+
+    this._edgesInfo[DIRECTIONS.UP.VALUE] ||= this._nullEdgeInfo()
+    this._edgesInfo[DIRECTIONS.UP.VALUE].lineScales = [0, upY]
+    this._edgesInfo[DIRECTIONS.UP.VALUE].index = this._index - this._columns
+
+    this._edgesInfo[DIRECTIONS.RIGHT.VALUE] ||= this._nullEdgeInfo()
+    this._edgesInfo[DIRECTIONS.RIGHT.VALUE].lineScales = [rightX, 0]
+    this._edgesInfo[DIRECTIONS.RIGHT.VALUE].index = this._index + 1
+
+    this._edgesInfo[DIRECTIONS.LEFT.VALUE] ||= this._nullEdgeInfo()
+    this._edgesInfo[DIRECTIONS.LEFT.VALUE].lineScales = [leftX, 0]
+    this._edgesInfo[DIRECTIONS.LEFT.VALUE].index = this._index - 1
+  }
+
+  private _nullEdgeInfo(): EdgeInfo {
+    return {
+      lineScales: [],
+      index: 0
+    }
+  }
 }
