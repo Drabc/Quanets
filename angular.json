@@ -30,9 +30,13 @@
               "src/assets"
             ],
             "styles": [
+              "node_modules/bootstrap/dist/css/bootstrap.min.css",
               "src/styles.scss"
             ],
-            "scripts": ["node_modules/phaser/dist/phaser.min.js"]
+            "scripts": [
+              "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js",
+              "node_modules/phaser/dist/phaser.min.js"
+            ]
           },
           "configurations": {
             "production": {
@@ -70,6 +74,10 @@
             "development": {
               "browserTarget": "quanets:build:development"
             }
+          },
+          "options": {
+            "host": "192.168.1.167",
+            "port": 4200
           },
           "defaultConfiguration": "development"
         },
