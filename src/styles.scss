@@ -1,1 +1,9 @@
-/* You can add global styles to this file, and also import other style files */
+@font-face {
+  font-family: QuanetsMainFont; /* Provide a name for your font */
+  src: url('assets/square-font/square.ttf'); /* Specify the path to your TTF font */
+}
+
+.fontPreload {
+  font-family: QuanetsMainFont;
+  position: absolute;
+}
