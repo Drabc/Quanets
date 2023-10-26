@@ -1,3 +1,6 @@
+export * from './game-button'
 export * from './connector-arrow'
 export * from './connector'
-export * from './test-scene'
+export * from './player'
+export * from './game-setup.scene'
+export * from './game.scene'
