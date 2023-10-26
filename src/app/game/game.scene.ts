@@ -1,10 +1,8 @@
 import Phaser from 'phaser'
 import { Connector, Player }  from '.'
 import { Grid, GridCell }  from './shared'
+import { ContainerSizeInfo, GAME_SETUP } from './configs'
 
-const CELL_SIZE: number = 64
-const CONNECTOR_COLS = 10
-const CONNECTOR_ROWS = 10
 export class GameScene extends Phaser.Scene {
 
   private _connectors!: Phaser.Physics.Arcade.StaticGroup
@@ -12,6 +10,7 @@ export class GameScene extends Phaser.Scene {
   private _currentPlayer!: Player
   private _playerText!: Phaser.GameObjects.Text
   private _squareMade: boolean = false
+  private _containerConfig!: ContainerSizeInfo
 
   constructor() {
     super({ key: 'main' })
@@ -19,11 +18,23 @@ export class GameScene extends Phaser.Scene {
 
   public create(): void {
     this._loadBackground()
+    this._containerConfig = GAME_SETUP.CONNECTORS.CONTAINERS.SMALL
     const containerGrid: Grid = this._createContainerGrid()
-    const connectorGrid: Grid = new Grid(this, 0, 0, CONNECTOR_COLS, CONNECTOR_ROWS, CELL_SIZE, CELL_SIZE)
+    const startingIndex = this._getConnectorContainerStartingIndex(containerGrid, this._containerConfig)
+    const [xOffset, yOffset] = this._getConnectorContainerStartingOffset(containerGrid, this._containerConfig)
+    const connectorGrid: Grid = new Grid(
+      this,
+      0,
+      0,
+      this._containerConfig.COLS,
+      this._containerConfig.ROWS,
+      GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE,
+      GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE
+    )
+    console.log(startingIndex)
     connectorGrid.addBorder('connector-border')
-    containerGrid.addChild(19, connectorGrid)
-    // containerGrid.visualizeCells(0x0000ff)
+    containerGrid.addChild(startingIndex, connectorGrid, xOffset, yOffset)
+    containerGrid.visualizeCells(0x0000ff)
     // connectorGrid.visualizeCells(0xff0000)
 
     this._players.push(new Player('alex'))
@@ -74,7 +85,7 @@ export class GameScene extends Phaser.Scene {
       if (this._checkSquareMade(connector, initialDirection, modifier)) {
         const oppositeConnector = this._getOppositeConnector(connector, initialDirection, modifier)
         const xScale = oppositeConnector.index < connector.index ? -.2 : .8
-        const yScale =  oppositeConnector.index % CONNECTOR_COLS < connector.index % CONNECTOR_COLS ? -.1 : .9
+        const yScale =  oppositeConnector.index % this._containerConfig.COLS < connector.index % this._containerConfig.COLS ? -.1 : .9
         const text = this.add.text(0, 0, this._currentPlayer.stamp, {
           fontFamily: 'QuanetsMainFont',
           fontSize: '24px',
@@ -152,8 +163,21 @@ export class GameScene extends Phaser.Scene {
   private _createContainerGrid(): Grid {
     const gameWidth: number = this.game.config.width as number
     const gameHeight: number = this.game.config.height as number
-    const gridLength = gameWidth/CELL_SIZE
-    const gridHeight = gameHeight/CELL_SIZE
-    return new Grid(this, 0, 0, gridLength, gridHeight, CELL_SIZE, CELL_SIZE)
+    const gridLength = gameWidth/GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE
+    const gridHeight = gameHeight/GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE
+    return new Grid(this, 0, 0, gridLength, gridHeight, GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE, GAME_SETUP.CONNECTORS.CONTAINERS.CELL_SIZE)
+  }
+
+  private _getConnectorContainerStartingIndex(containerGrid: Grid, containerGridInfo: ContainerSizeInfo): number {
+    const x = Math.floor((containerGrid.columns - containerGridInfo.COLS) / 2)
+    const y = Math.floor((containerGrid.rows - containerGridInfo.ROWS) / 2)
+    return y * containerGrid.columns + x
+  }
+
+  private _getConnectorContainerStartingOffset(containerGrid: Grid, containerGridInfo: ContainerSizeInfo): number[] {
+    const xOffset = (containerGrid.columns - containerGridInfo.COLS) % 2 === 0 ? 0 : .5
+    const yOffset = (containerGrid.rows - containerGridInfo.ROWS) % 2 === 0 ? 0 : .5
+    return [xOffset, yOffset]
   }
 }
+

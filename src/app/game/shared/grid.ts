@@ -48,8 +48,11 @@ export class Grid extends Phaser.GameObjects.Container {
     }
   }
 
-  public addChild(index: number, grid: Grid): void {
+  public addChild(index: number, grid: Grid, xScale: number = 0, yScale: number = 0): void {
     const container = this.list[index] as Phaser.GameObjects.Container
+    const y = grid.cellHeight * yScale
+    const x = grid.cellWidth * xScale
+    grid.setPosition(x, y)
     container.add(grid)
   }
 
